@@ -62,29 +62,19 @@ data_reference_syms_files = [ "Zelda64RecompSyms/mm.us.rev1.datasyms.toml", "Zel
 additional_files = [ ]
 
 # Mod config options
+
 [[manifest.config_options]]
-id = "enum_option"
-name = "Enum Option"
-description = "Test enum config option"
+id = "recomp_log_level"
+name = "Log Level"
+description = "Log additional information to the console for debugging. (Only applies to debug builds of Zelda64Recompiled)."
 type = "Enum"
-options = [ "First", "Second" ]
-default = "First"
+options = [ "NONE", "FATAL", "ERROR", "WARNING", "INFO", "DEBUG", "VERBOSE"]
+default = "ERROR"
 
 [[manifest.config_options]]
-id = "number_option"
-name = "Number Option"
-description = "Test number config option."
-type = "Number"
-min = 0
-max = 10
-step = 0.1
-precision = 1
-percent = false
-default = 1
-
-[[manifest.config_options]]
-id = "string_option"
-name = "String Option"
-description = "Test string config option."
-type = "String"
-default = "Lorem Ipsum"
+id = "recomp_log_colors"
+name = "Colors"
+description = "Use ANSI color codes to make log messages visually distinct. (Only applies to debug builds of Zelda64Recompiled)"
+type = "Enum"
+options = [ "Off", "On" ]
+default = "On"
