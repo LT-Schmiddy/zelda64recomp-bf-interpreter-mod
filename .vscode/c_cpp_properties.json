@@ -20,7 +20,8 @@
                 "F3DEX_GBI_2",
                 "_LANGUAGE_C",
                 "MIPS",
-                "COMBINED_INTELLISENSE"
+                "COMBINED_INTELLISENSE",
+                "BRAINFUCK_EXTENSION_DEBUG"
             ],
             // "compilerPath": "clang",
             "cStandard": "c99",

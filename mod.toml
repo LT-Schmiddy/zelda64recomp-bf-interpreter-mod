@@ -42,7 +42,6 @@ dependencies = [
 # Native libraries (e.g. DLLs) and the functions they export.
 native_libraries = [
 # Example native library:
-   { name = "mm_recomp_mod_template_extlib", funcs = ["native_lib_test"] }
 ]
 
 # Inputs to the mod tool.
