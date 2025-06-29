@@ -1,5 +1,7 @@
 # LTSchmiddy's Majora's Mask: Recompiled Mod Template
 
+BF interpreter is based on [this interpreter by fabianishere](https://github.com/fabianishere/brainfuck?tab=Apache-2.0-1-ov-file).
+
 This my custom version of the Majora's Mask: Recompiled mod template. It offers a number of features that the base template doesn't have, including:
 
 * Optional building of external libraries (referred to as extlibs) alongside the mod nrm, and keeping the code for both in the same repository.
