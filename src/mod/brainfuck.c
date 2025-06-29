@@ -27,12 +27,11 @@ size_t strlen(const char* str) {
 	return (p - str);
 }
 
-int putchar(int chr){
+int brainfuck_putchar(BrainfuckExecutionContext* context, BrainfuckInstruction* instruction, int chr){
 	return recomp_printf("%c", chr);
 }
 
 void bf_on_exit(int bf_exit_code) {}
-
 
 #define BF_EXIT_FAILURE 1
 #define BF_EXIT(code) bf_on_exit(code); return
@@ -60,7 +59,7 @@ BrainfuckExecutionContext * brainfuck_context(unsigned char* tape, int size) {
 	BrainfuckExecutionContext *context = (BrainfuckExecutionContext *) 
 			recomp_alloc(sizeof(BrainfuckExecutionContext));
 	
-	context->output_handler = &putchar;
+	context->output_handler = &brainfuck_putchar;
 	context->input_handler = &brainfuck_getchar;
 	context->tape = tape;
 	context->tape_index = 0;
@@ -204,6 +203,31 @@ BrainfuckInstruction * brainfuck_insert_after(BrainfuckState *state, BrainfuckIn
 		return instruction;
 }
 
+BrainFuckInstructionType brainfuck_token_to_type(unsigned char token) {
+	switch(token) {
+	case BRAINFUCK_TOKEN_PLUS:
+		return BRAINFUCK_INSTRUCTION_PLUS;
+	case BRAINFUCK_TOKEN_MINUS:
+		return BRAINFUCK_INSTRUCTION_MINUS;
+	case BRAINFUCK_TOKEN_NEXT:
+		return BRAINFUCK_INSTRUCTION_NEXT;
+	case BRAINFUCK_TOKEN_PREVIOUS:
+		return BRAINFUCK_INSTRUCTION_PREVIOUS;
+	case BRAINFUCK_TOKEN_OUTPUT:
+		return BRAINFUCK_INSTRUCTION_OUTPUT;
+	case BRAINFUCK_TOKEN_INPUT:
+		return BRAINFUCK_INSTRUCTION_INPUT;
+	case BRAINFUCK_TOKEN_LOOP_START:
+		return BRAINFUCK_INSTRUCTION_LOOP_START;
+	case BRAINFUCK_TOKEN_LOOP_END:
+		return BRAINFUCK_INSTRUCTION_LOOP_END;
+	case BRAINFUCK_TOKEN_BREAK:
+		return BRAINFUCK_INSTRUCTION_BREAK;
+	default:
+		return BRAINFUCK_INSTRUCTION_UNKNOWN;
+	}
+}
+
 /**
  * Reads a character, converts it to an instruction and repeats until the string ends
  *	and will then return a linked list containing all instructions.
@@ -253,7 +277,7 @@ BrainfuckInstruction * brainfuck_parse_substring_incremental(char *str, int *ptr
 	instruction->loop = 0;
 	char c, temp_c;
 	for (; *ptr < end && (c = str[*ptr]); (*ptr)++) {
-			instruction->type = c;
+			instruction->type = brainfuck_token_to_type(c);
 			instruction->difference = 1;
 			switch(c) {
 			case BRAINFUCK_TOKEN_PLUS:
@@ -336,7 +360,7 @@ BrainfuckInstruction * brainfuck_parse_character(char c) {
 	default:
 		return NULL;
 	}
-	instruction->type = c;
+	instruction->type = brainfuck_token_to_type(c);
 	return instruction;
 }
 
@@ -408,13 +432,13 @@ void brainfuck_execute(BrainfuckInstruction *root, BrainfuckExecutionContext *co
 	int index;
 	while (instruction != NULL && instruction->type != BRAINFUCK_TOKEN_LOOP_END) {
 		switch (instruction->type) {
-		case BRAINFUCK_TOKEN_PLUS:
+		case BRAINFUCK_INSTRUCTION_PLUS:
 			context->tape[context->tape_index] += instruction->difference;
 			break;
-		case BRAINFUCK_TOKEN_MINUS:
+		case BRAINFUCK_INSTRUCTION_MINUS:
 			context->tape[context->tape_index] -= instruction->difference;
 			break;
-		case BRAINFUCK_TOKEN_NEXT:
+		case BRAINFUCK_INSTRUCTION_NEXT:
 			if (instruction->difference >= BF_INT_MAX - (long) context->tape_size ||
 					(long) context->tape_index + instruction->difference >= (long) context->tape_size) {
 				LOG_ERROR("error: tape memory out of bounds (overrun)\nexceeded the tape size of %zd cells\n", context->tape_size);
@@ -422,7 +446,7 @@ void brainfuck_execute(BrainfuckInstruction *root, BrainfuckExecutionContext *co
 			}
 			context->tape_index += instruction->difference;
 			break;
-		case BRAINFUCK_TOKEN_PREVIOUS:
+		case BRAINFUCK_INSTRUCTION_PREVIOUS:
 			if (instruction->difference >= BF_INT_MAX - (long) context->tape_size ||
                     (long) context->tape_index - instruction->difference < 0) {
 				LOG_ERROR("error: tape memory out of bounds (underrun)\nundershot the tape size of %zd cells\n", context->tape_size);
@@ -430,13 +454,13 @@ void brainfuck_execute(BrainfuckInstruction *root, BrainfuckExecutionContext *co
 			}
 			context->tape_index -= instruction->difference;
 			break;
-		case BRAINFUCK_TOKEN_OUTPUT:
+		case BRAINFUCK_INSTRUCTION_OUTPUT:
 			for (index = 0; index < instruction->difference; index++)
-				context->output_handler(context->tape[context->tape_index]);
+				context->output_handler(context, instruction, context->tape[context->tape_index]);
 			break;
-		case BRAINFUCK_TOKEN_INPUT:
+		case BRAINFUCK_INSTRUCTION_INPUT:
 			for (index = 0; index < instruction->difference; index++) {
-				char input = context->input_handler();
+				char input = context->input_handler(context, instruction);
 				if (input == BRAINFUCK_EOF) {
 					if (BRAINFUCK_EOF_BEHAVIOR != 1)
 						context->tape[context->tape_index] = BRAINFUCK_EOF_BEHAVIOR;
@@ -445,11 +469,11 @@ void brainfuck_execute(BrainfuckInstruction *root, BrainfuckExecutionContext *co
 				}
 			}
 			break;
-		case BRAINFUCK_TOKEN_LOOP_START:
+		case BRAINFUCK_INSTRUCTION_LOOP_START:
 			while(context->tape[context->tape_index])
 				brainfuck_execute(instruction->loop, context);
 			break;
-		case BRAINFUCK_TOKEN_BREAK: {
+		case BRAINFUCK_INSTRUCTION_BREAK: {
 			LOGD("BRAINFUCK_TOKEN_BREAK:");
 			int low = context->tape_index - 10;
 			if (low < 0) { low = 0; }
@@ -502,7 +526,7 @@ void brainfuck_execution_stop(BrainfuckExecutionContext *context) {
  * Reads exactly one char from stdin.
  * @return The character read from stdin.
  */
-char brainfuck_getchar() {
+char brainfuck_getchar(BrainfuckExecutionContext* context, BrainfuckInstruction* instruction) {
 	// char ch, t;
 	// ch = getchar();
 	// while ((t = getchar()) != '\n' && t != EOF) { }	/* Clear stdin */

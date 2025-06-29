@@ -39,8 +39,27 @@
 
 #define READLINE_HIST_SIZE 20
 
+#define bf_va_start(v, l) __builtin_va_start(v, l)
+#define bf_va_end(v) __builtin_va_end(v)
+#define bf_va_arg(v, l) __builtin_va_arg(v, l)
+#define bf_va_copy(d, s) __builtin_va_copy(d, s)
+
+#include "libc/stdarg.h"
 #include "modding.h"
 #include "global.h"
+
+typedef enum BrainFuckInstructionType {
+	BRAINFUCK_INSTRUCTION_UNKNOWN,
+	BRAINFUCK_INSTRUCTION_PLUS,
+	BRAINFUCK_INSTRUCTION_MINUS,
+	BRAINFUCK_INSTRUCTION_PREVIOUS,
+	BRAINFUCK_INSTRUCTION_NEXT,
+	BRAINFUCK_INSTRUCTION_OUTPUT,
+	BRAINFUCK_INSTRUCTION_INPUT,
+	BRAINFUCK_INSTRUCTION_LOOP_START,
+	BRAINFUCK_INSTRUCTION_LOOP_END,
+	BRAINFUCK_INSTRUCTION_BREAK,
+} BrainFuckInstructionType;
 
 /**
  * Represents a brainfuck instruction.
@@ -54,7 +73,7 @@ typedef struct BrainfuckInstruction {
 	/**
 	 * The type of this instruction.
 	 */
-	char type;
+	BrainFuckInstructionType type;
 	/**
 	 * The next instruction in the linked list.
 	 */
@@ -85,19 +104,20 @@ typedef struct BrainfuckState {
 	struct BrainfuckInstruction *head;
 } BrainfuckState;
 
+typedef struct BrainfuckExecutionContext BrainfuckExecutionContext;
 /**
  * The callback that will be invoked when the BRAINFUCK_TOKEN_OUTPUT token is found.
  * 
  * @param chr The value of the current cell.
  */
-typedef int (*BrainfuckOutputHandler) (int chr);
+typedef int (*BrainfuckOutputHandler) (BrainfuckExecutionContext* context, BrainfuckInstruction* instruction, int chr);
 
 /**
  * The callback that will be invoked when the BRAINFUCK_TOKEN_INPUT token is found.
  * 
  * @return The character that is read.
  */
-typedef char (*BrainfuckInputHandler) (void);
+typedef char (*BrainfuckInputHandler) (BrainfuckExecutionContext* context, BrainfuckInstruction* instruction);
 
 /**
  * This structure is used as a layer between a brainfuck program and
@@ -130,17 +150,27 @@ typedef struct BrainfuckExecutionContext {
 	int shouldStop;
 } BrainfuckExecutionContext;
 
+
+typedef struct BrainfuckArgumentBinding {
+	unsigned int is_variadic;
+	void* arg;
+	va_list* arg_list;
+	unsigned int read_pos;
+	struct BrainfuckArgumentBinding* next;
+
+} BrainfuckArgumentBinding;
+
 /**
  * Creates a new state.
  */
-BrainfuckState * brainfuck_state();
+BrainfuckState* brainfuck_state();
 
 /**
  * Creates a new context.
  *
  * @param size The size of the tape.
  */
-BrainfuckExecutionContext * brainfuck_context(unsigned char*, int);
+BrainfuckExecutionContext* brainfuck_context(unsigned char*, int);
 
 /**
  * Removes the given instruction from the linked list.
@@ -149,7 +179,7 @@ BrainfuckExecutionContext * brainfuck_context(unsigned char*, int);
  * @param instruction The instruction to remove.
  * @return The instruction that is removed.
  */
-BrainfuckInstruction * brainfuck_remove(struct BrainfuckState *, struct BrainfuckInstruction *);
+BrainfuckInstruction* brainfuck_remove(struct BrainfuckState *, struct BrainfuckInstruction *);
 
 /**
  * Adds an instruction to the instruction list.
@@ -158,7 +188,7 @@ BrainfuckInstruction * brainfuck_remove(struct BrainfuckState *, struct Brainfuc
  * @param instruction The instruction to add.
  * @return The instruction that is given.
  */
-BrainfuckInstruction * brainfuck_add(struct BrainfuckState *state, struct BrainfuckInstruction *);
+BrainfuckInstruction* brainfuck_add(struct BrainfuckState *state, struct BrainfuckInstruction *);
 
 /**
  * Adds an instruction to the front of the instruction list.
@@ -167,7 +197,7 @@ BrainfuckInstruction * brainfuck_add(struct BrainfuckState *state, struct Brainf
  * @param instruction The instruction to add.
  * @return The instruction that is given.
  */
-BrainfuckInstruction * brainfuck_add_first(struct BrainfuckState *state, struct BrainfuckInstruction *);
+BrainfuckInstruction* brainfuck_add_first(struct BrainfuckState *state, struct BrainfuckInstruction *);
 
 /**
  * Adds an instruction to the instruction list.
@@ -177,7 +207,7 @@ BrainfuckInstruction * brainfuck_add_first(struct BrainfuckState *state, struct 
  * @param instruction The instruction to add.
  * @return The instruction that is given.
  */
-BrainfuckInstruction * brainfuck_insert_before(struct BrainfuckState *, struct BrainfuckInstruction *, 
+BrainfuckInstruction* brainfuck_insert_before(struct BrainfuckState *, struct BrainfuckInstruction *, 
 	struct BrainfuckInstruction *);
 
 /**
@@ -188,7 +218,7 @@ BrainfuckInstruction * brainfuck_insert_before(struct BrainfuckState *, struct B
  * @param instruction The instruction to add.
  * @return The instruction that is given.
  */
-BrainfuckInstruction * brainfuck_insert_after(struct BrainfuckState *, struct BrainfuckInstruction *, 
+BrainfuckInstruction* brainfuck_insert_after(struct BrainfuckState *, struct BrainfuckInstruction *, 
 	struct BrainfuckInstruction *);
 
 /**
@@ -217,7 +247,7 @@ BrainfuckInstruction * brainfuck_insert_after(struct BrainfuckState *, struct Br
  * @param str The string to read from.
  * @param The head of the linked list containing the instructions.
  */
-BrainfuckInstruction * brainfuck_parse_string(char *);
+BrainfuckInstruction* brainfuck_parse_string(char *);
 
 /**
  * Reads a character, converts it to an instruction and repeats until the string ends
@@ -229,7 +259,7 @@ BrainfuckInstruction * brainfuck_parse_string(char *);
  *	When <code>-1</code> is given, it will stop at the end of the string.
  * @param The head of the linked list containing the instructions.
  */
-BrainfuckInstruction * brainfuck_parse_substring(char *, int, int);
+BrainfuckInstruction* brainfuck_parse_substring(char *, int, int);
 
 /**
  * Reads a character, converts it to an instruction and repeats until the string ends
@@ -244,7 +274,7 @@ BrainfuckInstruction * brainfuck_parse_substring(char *, int, int);
  *	When <code>-1</code> is given, it will stop at the end of the string.
  * @param The head of the linked list containing the instructions.
  */
-BrainfuckInstruction * brainfuck_parse_substring_incremental(char *, int *, int);
+BrainfuckInstruction* brainfuck_parse_substring_incremental(char *, int *, int);
 
 /**
  * Converts the given character to an instruction.
@@ -252,7 +282,7 @@ BrainfuckInstruction * brainfuck_parse_substring_incremental(char *, int *, int)
  * @param c The character to convert.
  * @param The character that's converted into an instruction.
  */
-BrainfuckInstruction * brainfuck_parse_character(char);
+BrainfuckInstruction* brainfuck_parse_character(char);
 
 /**
  * Destroys the given instruction.
@@ -304,6 +334,6 @@ void brainfuck_execution_stop(BrainfuckExecutionContext *);
  * Reads exactly one char from stdin.
  * @return The character read from stdin. 
  */
-char brainfuck_getchar(void);
+char brainfuck_getchar(BrainfuckExecutionContext *, BrainfuckInstruction *);
 
 #endif /* BRAINFUCK_H */
